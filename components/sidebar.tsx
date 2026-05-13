@@ -9,6 +9,7 @@ import {
   CalendarDays,
   Users,
   Newspaper,
+  ShoppingCart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
@@ -48,6 +49,11 @@ const navItems = [
     label: "News Consolidator",
     href: "/news",
     icon: Newspaper,
+  },
+  {
+    label: "nokonoko POS",
+    href: "/pos",
+    icon: ShoppingCart,
   },
 ];
 
