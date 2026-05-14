@@ -121,8 +121,8 @@ export default function HistoryPage() {
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setSortDesc(v => !v)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold border-2 transition-all hover:opacity-80"
-            style={{ borderColor: `${BLUE}20`, color: BLUE, backgroundColor: 'white' }}
+            className="flex items-center gap-1.5 px-4 py-3 rounded-xl text-xs sm:text-sm font-bold border-2 transition-all hover:opacity-80 active:scale-95"
+            style={{ borderColor: `${BLUE}20`, color: BLUE, backgroundColor: 'white', minHeight: 44 }}
           >
             <span>{sortDesc ? '↓' : '↑'}</span>
             <span>{sortDesc ? 'Latest first' : 'Oldest first'}</span>
@@ -133,15 +133,15 @@ export default function HistoryPage() {
             placeholder="Search order # or item…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="rounded-xl px-3 py-2 text-xs sm:text-sm font-medium border-2 outline-none flex-1 min-w-[140px] transition-all"
-            style={{ borderColor: search ? BLUE : `${BLUE}20`, color: BLUE, backgroundColor: 'white' }}
+            className="rounded-xl px-4 py-3 text-xs sm:text-sm font-medium border-2 outline-none flex-1 min-w-[140px] transition-all"
+            style={{ borderColor: search ? BLUE : `${BLUE}20`, color: BLUE, backgroundColor: 'white', minHeight: 44 }}
           />
 
           <button
             onClick={() => exportCSV(monthOrders, `nokonoko-${monthLabel}.csv`)}
             disabled={monthOrders.length === 0}
-            className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all hover:opacity-80 disabled:opacity-30"
-            style={{ borderColor: `${BLUE}20`, color: BLUE, backgroundColor: 'white' }}
+            className="flex items-center gap-1 px-4 py-3 rounded-xl text-xs font-bold border-2 transition-all hover:opacity-80 active:scale-95 disabled:opacity-30"
+            style={{ borderColor: `${BLUE}20`, color: BLUE, backgroundColor: 'white', minHeight: 44 }}
           >
             ↓ Month
           </button>
@@ -149,8 +149,8 @@ export default function HistoryPage() {
           <button
             onClick={() => exportCSV(yearOrders, `nokonoko-${yearLabel}.csv`)}
             disabled={yearOrders.length === 0}
-            className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all hover:opacity-80 disabled:opacity-30"
-            style={{ borderColor: `${BLUE}20`, color: BLUE, backgroundColor: 'white' }}
+            className="flex items-center gap-1 px-4 py-3 rounded-xl text-xs font-bold border-2 transition-all hover:opacity-80 active:scale-95 disabled:opacity-30"
+            style={{ borderColor: `${BLUE}20`, color: BLUE, backgroundColor: 'white', minHeight: 44 }}
           >
             ↓ Year
           </button>
@@ -195,7 +195,7 @@ export default function HistoryPage() {
                   <div key={order.id} className="rounded-2xl overflow-hidden" style={{ backgroundColor: 'white' }}>
                     <button
                       onClick={() => setExpanded(isOpen ? null : order.id)}
-                      className="w-full flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-4 text-left transition-opacity hover:opacity-75"
+                      className="w-full flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-5 text-left transition-opacity hover:opacity-75"
                     >
                       {/* Time */}
                       <div className="shrink-0 text-center w-12 sm:w-14">

@@ -137,7 +137,7 @@ function OrderPanel({ onCharge, charging, onClose, customerName, onCustomerNameC
             {onClose && (
               <button
                 onClick={onClose}
-                className="w-7 h-7 flex items-center justify-center rounded-full text-base font-black"
+                className="w-10 h-10 flex items-center justify-center rounded-full text-lg font-black transition-all hover:opacity-70 active:scale-95"
                 style={{ backgroundColor: `${BLUE}10`, color: BLUE }}
               >×</button>
             )}
@@ -159,16 +159,16 @@ function OrderPanel({ onCharge, charging, onClose, customerName, onCustomerNameC
           <div className="space-y-4">
             {cart.map(item => (
               <div key={item.cartId} className="flex items-start gap-3">
-                <div className="flex items-center gap-1 pt-0.5 shrink-0">
+                <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     onClick={() => updateQty(item.cartId, -1)}
-                    className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-black leading-none transition-all hover:opacity-60"
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-lg font-black leading-none transition-all hover:opacity-60 active:scale-95"
                     style={{ backgroundColor: `${BLUE}12`, color: BLUE }}
                   >−</button>
-                  <span className="w-5 text-center text-sm font-black" style={{ color: BLUE }}>{item.quantity}</span>
+                  <span className="w-6 text-center text-sm font-black" style={{ color: BLUE }}>{item.quantity}</span>
                   <button
                     onClick={() => updateQty(item.cartId, 1)}
-                    className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-black leading-none transition-all hover:opacity-60"
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-lg font-black leading-none transition-all hover:opacity-60 active:scale-95"
                     style={{ backgroundColor: `${BLUE}12`, color: BLUE }}
                   >+</button>
                 </div>
@@ -309,16 +309,16 @@ export default function POSPage() {
                             <button
                               onClick={() => { addToCart(item, 'hot'); playAddSound() }}
                               disabled={isOut}
-                              className="px-3 sm:px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-bold transition-all hover:opacity-80 active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed"
-                              style={{ backgroundColor: BLUE, color: CREAM }}
+                              className="px-3 sm:px-5 py-2.5 sm:py-3 rounded-full text-xs sm:text-sm font-bold transition-all hover:opacity-80 active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed"
+                              style={{ backgroundColor: BLUE, color: CREAM, minHeight: 44 }}
                             >
                               Hot&nbsp;RM{item.hotPrice}
                             </button>
                             <button
                               onClick={() => { addToCart(item, 'iced'); playAddSound() }}
                               disabled={isOut}
-                              className="px-3 sm:px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-bold transition-all hover:opacity-80 active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed"
-                              style={{ border: `2px solid ${BLUE}`, color: BLUE, backgroundColor: 'transparent' }}
+                              className="px-3 sm:px-5 py-2.5 sm:py-3 rounded-full text-xs sm:text-sm font-bold transition-all hover:opacity-80 active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed"
+                              style={{ border: `2px solid ${BLUE}`, color: BLUE, backgroundColor: 'transparent', minHeight: 44 }}
                             >
                               Iced&nbsp;RM{item.icedPrice}
                             </button>
@@ -328,8 +328,8 @@ export default function POSPage() {
                         <button
                           onClick={() => { addToCart(item); playAddSound() }}
                           disabled={isOut}
-                          className="mt-3 sm:mt-4 px-4 sm:px-6 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-bold transition-all hover:opacity-80 active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed"
-                          style={{ backgroundColor: BLUE, color: CREAM }}
+                          className="mt-3 sm:mt-4 px-4 sm:px-6 py-2.5 sm:py-3 rounded-full text-xs sm:text-sm font-bold transition-all hover:opacity-80 active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed"
+                          style={{ backgroundColor: BLUE, color: CREAM, minHeight: 44 }}
                         >
                           RM{item.fixedPrice}
                         </button>

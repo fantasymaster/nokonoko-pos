@@ -491,8 +491,8 @@ function PriceRow({ itemId, hasTemperature, hotPrice, icedPrice, fixedPrice }: {
         </span>
         <button
           onClick={() => setEditing(true)}
-          className="text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all hover:opacity-70"
-          style={{ backgroundColor: `${BLUE}10`, color: BLUE }}
+          className="text-xs font-bold px-3 py-2 rounded-xl transition-all hover:opacity-70 active:scale-95"
+          style={{ backgroundColor: `${BLUE}10`, color: BLUE, minHeight: 36 }}
         >
           Edit Price
         </button>
@@ -639,8 +639,8 @@ export default function InventoryPage() {
                   </span>
                   <button
                     onClick={() => setEditingItem(item)}
-                    className="text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all hover:opacity-70"
-                    style={{ backgroundColor: `${BLUE}10`, color: BLUE }}
+                    className="text-xs font-bold px-3 py-2 rounded-xl transition-all hover:opacity-70 active:scale-95"
+                    style={{ backgroundColor: `${BLUE}10`, color: BLUE, minHeight: 36 }}
                   >
                     Edit
                   </button>
@@ -677,12 +677,12 @@ export default function InventoryPage() {
                 <button
                   onClick={() => updateStock(item.id, -1)}
                   disabled={item.stock === 0}
-                  className="w-9 h-9 rounded-full font-black text-base flex items-center justify-center transition-all hover:opacity-70 disabled:opacity-25 disabled:cursor-not-allowed"
+                  className="w-11 h-11 rounded-full font-black text-xl flex items-center justify-center transition-all hover:opacity-70 active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed"
                   style={{ backgroundColor: `${BLUE}10`, color: BLUE }}
                 >−</button>
                 <button
                   onClick={() => updateStock(item.id, 1)}
-                  className="w-9 h-9 rounded-full font-black text-base flex items-center justify-center transition-all hover:opacity-70"
+                  className="w-11 h-11 rounded-full font-black text-xl flex items-center justify-center transition-all hover:opacity-70 active:scale-95"
                   style={{ backgroundColor: `${BLUE}10`, color: BLUE }}
                 >+</button>
                 <div className="flex flex-1 items-center gap-1.5 ml-1">
@@ -691,12 +691,12 @@ export default function InventoryPage() {
                     value={addInputs[item.id] ?? ''}
                     onChange={e => setAddInputs(prev => ({ ...prev, [item.id]: e.target.value }))}
                     onKeyDown={e => e.key === 'Enter' && applyAdd(item.id)}
-                    className="flex-1 min-w-0 rounded-xl px-3 py-2 text-sm font-semibold border outline-none focus:ring-2"
+                    className="flex-1 min-w-0 rounded-xl px-3 py-3 text-sm font-semibold border outline-none"
                     style={{ borderColor: `${BLUE}20`, color: BLUE, backgroundColor: `${BLUE}04` }}
                   />
                   <button
                     onClick={() => applyAdd(item.id)}
-                    className="px-3 py-2 rounded-xl text-sm font-bold transition-all hover:opacity-80 active:scale-95 shrink-0"
+                    className="px-4 py-3 rounded-xl text-sm font-bold transition-all hover:opacity-80 active:scale-95 shrink-0"
                     style={{ backgroundColor: BLUE, color: CREAM }}
                   >Add</button>
                 </div>

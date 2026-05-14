@@ -39,15 +39,15 @@ export function POSNav() {
 
   return (
     <header
-      className="flex items-center justify-between px-3 sm:px-8 shrink-0 border-b gap-2"
-      style={{ height: 56, borderColor: `${BLUE}18`, backgroundColor: CREAM }}
+      className="flex items-center justify-between px-3 sm:px-6 md:px-8 shrink-0 border-b gap-2"
+      style={{ height: 64, borderColor: `${BLUE}18`, backgroundColor: CREAM }}
     >
       {/* Brand */}
       <div className="flex items-end gap-1 shrink-0">
-        <span className="text-[17px] sm:text-[22px] font-black tracking-[-0.04em] leading-none" style={{ color: BLUE }}>
+        <span className="text-[17px] sm:text-[20px] md:text-[22px] font-black tracking-[-0.04em] leading-none" style={{ color: BLUE }}>
           nokonoko
         </span>
-        <span className="text-[9px] sm:text-xs font-black leading-none mb-0.5" style={{ color: BLUE }}>™</span>
+        <span className="text-[9px] sm:text-[10px] font-black leading-none mb-0.5" style={{ color: BLUE }}>™</span>
         <span
           className="ml-1 text-[8px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full leading-none mb-1"
           style={{ backgroundColor: `${BLUE}15`, color: BLUE }}
@@ -58,7 +58,7 @@ export function POSNav() {
 
       {/* Tabs — scrollable on mobile */}
       <nav
-        className="flex gap-0.5 overflow-x-auto flex-1 justify-center"
+        className="flex gap-1 overflow-x-auto flex-1 justify-center items-center"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' } as React.CSSProperties}
       >
         {tabs.map(tab => {
@@ -69,10 +69,11 @@ export function POSNav() {
             <Link
               key={tab.href}
               href={tab.href}
-              className="relative px-2.5 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-sm font-bold rounded-lg transition-colors whitespace-nowrap shrink-0"
+              className="relative flex items-center px-4 py-2.5 sm:px-5 sm:py-3 md:px-6 text-xs sm:text-sm md:text-[15px] font-bold rounded-xl transition-colors whitespace-nowrap shrink-0"
               style={{
                 backgroundColor: active ? BLUE : 'transparent',
                 color: active ? CREAM : `${BLUE}55`,
+                minHeight: 44,
               }}
             >
               {tab.label}
