@@ -28,10 +28,10 @@ export default function InventoryPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto p-8" style={{ backgroundColor: CREAM }}>
+    <div className="h-full overflow-y-auto p-4 sm:p-8" style={{ backgroundColor: CREAM }}>
       {/* Header */}
-      <div className="flex items-end justify-between mb-7">
-        <h1 className="text-4xl font-black tracking-[-0.03em]" style={{ color: BLUE }}>
+      <div className="flex items-end justify-between mb-6 sm:mb-7">
+        <h1 className="text-3xl sm:text-4xl font-black tracking-[-0.03em]" style={{ color: BLUE }}>
           Inventory
         </h1>
         <div className="flex gap-3 text-sm font-semibold">
@@ -54,7 +54,7 @@ export default function InventoryPage() {
       </div>
 
       {/* Grid */}
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
         {menu.map(item => {
           const displayName = item.modifier ? `${item.name} ${item.modifier}` : item.name
           const { label, color } = statusFor(item.stock, item.lowStockThreshold)

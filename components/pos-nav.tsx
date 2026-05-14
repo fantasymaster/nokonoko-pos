@@ -17,7 +17,7 @@ function LiveClock() {
     return () => clearInterval(id)
   }, [])
   return (
-    <span className="text-sm font-bold tabular-nums" style={{ color: `${BLUE}60` }}>
+    <span className="text-xs sm:text-sm font-bold tabular-nums hidden sm:block shrink-0" style={{ color: `${BLUE}60` }}>
       {time}
     </span>
   )
@@ -34,30 +34,33 @@ export function POSNav() {
     { label: 'Order', href: '/pos' },
     { label: 'Analytics', href: '/pos/analytics' },
     { label: 'Inventory', href: '/pos/inventory', badge: alertCount || undefined },
-    { label: 'Order History', href: '/pos/history' },
+    { label: 'History', href: '/pos/history' },
   ]
 
   return (
     <header
-      className="flex items-center justify-between px-8 shrink-0 border-b"
-      style={{ height: 64, borderColor: `${BLUE}18`, backgroundColor: CREAM }}
+      className="flex items-center justify-between px-3 sm:px-8 shrink-0 border-b gap-2"
+      style={{ height: 56, borderColor: `${BLUE}18`, backgroundColor: CREAM }}
     >
       {/* Brand */}
-      <div className="flex items-end gap-1">
-        <span className="text-[22px] font-black tracking-[-0.04em] leading-none" style={{ color: BLUE }}>
+      <div className="flex items-end gap-1 shrink-0">
+        <span className="text-[17px] sm:text-[22px] font-black tracking-[-0.04em] leading-none" style={{ color: BLUE }}>
           nokonoko
         </span>
-        <span className="text-xs font-black leading-none mb-0.5" style={{ color: BLUE }}>™</span>
+        <span className="text-[9px] sm:text-xs font-black leading-none mb-0.5" style={{ color: BLUE }}>™</span>
         <span
-          className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full leading-none mb-1"
+          className="ml-1 text-[8px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full leading-none mb-1"
           style={{ backgroundColor: `${BLUE}15`, color: BLUE }}
         >
           POS
         </span>
       </div>
 
-      {/* Tabs */}
-      <nav className="flex gap-1">
+      {/* Tabs — scrollable on mobile */}
+      <nav
+        className="flex gap-0.5 overflow-x-auto flex-1 justify-center"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' } as React.CSSProperties}
+      >
         {tabs.map(tab => {
           const active = tab.href === '/pos'
             ? pathname === '/pos'
@@ -66,7 +69,7 @@ export function POSNav() {
             <Link
               key={tab.href}
               href={tab.href}
-              className="relative px-4 py-2 text-sm font-bold rounded-lg transition-colors"
+              className="relative px-2.5 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-sm font-bold rounded-lg transition-colors whitespace-nowrap shrink-0"
               style={{
                 backgroundColor: active ? BLUE : 'transparent',
                 color: active ? CREAM : `${BLUE}55`,
@@ -75,7 +78,7 @@ export function POSNav() {
               {tab.label}
               {tab.badge ? (
                 <span
-                  className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black flex items-center justify-center"
+                  className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-0.5 rounded-full text-[9px] font-black flex items-center justify-center"
                   style={{ backgroundColor: '#EF4444', color: 'white' }}
                 >
                   {tab.badge}

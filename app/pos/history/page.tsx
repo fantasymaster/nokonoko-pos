@@ -1,27 +1,37 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { usePOS } from '@/lib/pos-context'
 import type { CompletedOrder } from '@/lib/pos-types'
 
 const BLUE = '#1A28FF'
 const CREAM = '#F2EDE4'
 
-function dateLabel(date: Date): string {
-  const now = new Date()
-  const todayStr = now.toDateString()
-  const yesterday = new Date(now)
-  yesterday.setDate(now.getDate() - 1)
-  const yesterdayStr = yesterday.toDateString()
+function useTodayDate(): Date {
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const id = setInterval(() => {
+      const d = new Date()
+      setNow(prev => prev.toDateString() !== d.toDateString() ? d : prev)
+    }, 60_000)
+    return () => clearInterval(id)
+  }, [])
+  return now
+}
+
+function dateLabel(date: Date, ref: Date): string {
+  const todayStr = ref.toDateString()
+  const yesterday = new Date(ref)
+  yesterday.setDate(ref.getDate() - 1)
   if (date.toDateString() === todayStr) return 'Today'
-  if (date.toDateString() === yesterdayStr) return 'Yesterday'
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday'
   return date.toLocaleDateString('en-MY', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 }
 
-function groupByDate(orders: CompletedOrder[]): { label: string; orders: CompletedOrder[] }[] {
+function groupByDate(orders: CompletedOrder[], ref: Date): { label: string; orders: CompletedOrder[] }[] {
   const groups: { label: string; orders: CompletedOrder[] }[] = []
   for (const order of orders) {
-    const label = dateLabel(new Date(order.timestamp))
+    const label = dateLabel(new Date(order.timestamp), ref)
     const existing = groups.find(g => g.label === label)
     if (existing) existing.orders.push(order)
     else groups.push({ label, orders: [order] })
@@ -29,13 +39,46 @@ function groupByDate(orders: CompletedOrder[]): { label: string; orders: Complet
   return groups
 }
 
+function exportCSV(orders: CompletedOrder[], filename: string) {
+  const rows = [
+    ['Order #', 'Date', 'Time', 'Items', 'Total (RM)'],
+    ...orders.map(o => {
+      const d = new Date(o.timestamp)
+      const date = d.toLocaleDateString('en-MY', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      const time = d.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' })
+      const items = o.items
+        .map(i => `${i.displayName}${i.temperature ? ` (${i.temperature})` : ''} x${i.quantity}`)
+        .join('; ')
+      return [o.id, date, time, `"${items}"`, o.total]
+    }),
+  ]
+  const csv = rows.map(r => r.join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export default function HistoryPage() {
   const { orders } = usePOS()
+  const today = useTodayDate()
   const [expanded, setExpanded] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [sortDesc, setSortDesc] = useState(true)
 
   const totalRevenue = orders.reduce((s, o) => s + o.total, 0)
+
+  // CSV helpers
+  const monthOrders = orders.filter(o => {
+    const d = new Date(o.timestamp)
+    return d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth()
+  })
+  const yearOrders = orders.filter(o => new Date(o.timestamp).getFullYear() === today.getFullYear())
+  const monthLabel = today.toLocaleDateString('en-MY', { month: 'long', year: 'numeric' }).replace(' ', '-')
+  const yearLabel = today.getFullYear().toString()
 
   const grouped = useMemo(() => {
     const q = search.toLowerCase()
@@ -49,23 +92,23 @@ export default function HistoryPage() {
         o.id.toLowerCase().includes(q) ||
         o.items.some(i => i.displayName.toLowerCase().includes(q))
       )
-    const groups = groupByDate(sorted)
-    // Within each date group, show times latest → earliest
+    const groups = groupByDate(sorted, today)
     groups.forEach(g =>
       g.orders.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
     )
     return groups
-  }, [orders, search, sortDesc])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders, search, sortDesc, today.toDateString()])
 
   const totalFiltered = grouped.reduce((s, g) => s + g.orders.length, 0)
 
   return (
-    <div className="h-full overflow-y-auto p-8" style={{ backgroundColor: CREAM }}>
+    <div className="h-full overflow-y-auto p-4 sm:p-8" style={{ backgroundColor: CREAM }}>
 
       {/* Header */}
-      <div className="flex items-start justify-between mb-7">
-        <div>
-          <h1 className="text-4xl font-black tracking-[-0.03em]" style={{ color: BLUE }}>
+      <div className="mb-6 sm:mb-7">
+        <div className="mb-3">
+          <h1 className="text-3xl sm:text-4xl font-black tracking-[-0.03em]" style={{ color: BLUE }}>
             Order History
           </h1>
           <p className="mt-1 text-sm font-medium" style={{ color: `${BLUE}55` }}>
@@ -73,10 +116,11 @@ export default function HistoryPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Controls — wrap on mobile */}
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setSortDesc(v => !v)}
-            className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-bold border-2 transition-all hover:opacity-80"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold border-2 transition-all hover:opacity-80"
             style={{ borderColor: `${BLUE}20`, color: BLUE, backgroundColor: 'white' }}
           >
             <span>{sortDesc ? '↓' : '↑'}</span>
@@ -88,9 +132,27 @@ export default function HistoryPage() {
             placeholder="Search order # or item…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="rounded-xl px-4 py-2.5 text-sm font-medium border-2 outline-none w-56 transition-all"
+            className="rounded-xl px-3 py-2 text-xs sm:text-sm font-medium border-2 outline-none flex-1 min-w-[140px] transition-all"
             style={{ borderColor: search ? BLUE : `${BLUE}20`, color: BLUE, backgroundColor: 'white' }}
           />
+
+          <button
+            onClick={() => exportCSV(monthOrders, `nokonoko-${monthLabel}.csv`)}
+            disabled={monthOrders.length === 0}
+            className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all hover:opacity-80 disabled:opacity-30"
+            style={{ borderColor: `${BLUE}20`, color: BLUE, backgroundColor: 'white' }}
+          >
+            ↓ Month
+          </button>
+
+          <button
+            onClick={() => exportCSV(yearOrders, `nokonoko-${yearLabel}.csv`)}
+            disabled={yearOrders.length === 0}
+            className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all hover:opacity-80 disabled:opacity-30"
+            style={{ borderColor: `${BLUE}20`, color: BLUE, backgroundColor: 'white' }}
+          >
+            ↓ Year
+          </button>
         </div>
       </div>
 
@@ -129,32 +191,26 @@ export default function HistoryPage() {
                 const itemCount = order.items.reduce((s, i) => s + i.quantity, 0)
 
                 return (
-                  <div
-                    key={order.id}
-                    className="rounded-2xl overflow-hidden"
-                    style={{ backgroundColor: 'white' }}
-                  >
-                    {/* Row */}
+                  <div key={order.id} className="rounded-2xl overflow-hidden" style={{ backgroundColor: 'white' }}>
                     <button
                       onClick={() => setExpanded(isOpen ? null : order.id)}
-                      className="w-full flex items-center gap-4 px-6 py-4 text-left transition-opacity hover:opacity-75"
+                      className="w-full flex items-center gap-3 sm:gap-4 px-4 sm:px-6 py-4 text-left transition-opacity hover:opacity-75"
                     >
-                      {/* Time — most prominent date signal */}
-                      <div className="shrink-0 text-center w-14">
-                        <p className="text-base font-black leading-none tabular-nums" style={{ color: BLUE }}>
+                      {/* Time */}
+                      <div className="shrink-0 text-center w-12 sm:w-14">
+                        <p className="text-sm sm:text-base font-black leading-none tabular-nums" style={{ color: BLUE }}>
                           {timeStr}
                         </p>
-                        <p className="text-[10px] font-semibold mt-0.5" style={{ color: `${BLUE}40` }}>
+                        <p className="text-[9px] sm:text-[10px] font-semibold mt-0.5" style={{ color: `${BLUE}40` }}>
                           {order.id}
                         </p>
                       </div>
 
-                      {/* Divider */}
                       <div className="w-px self-stretch" style={{ backgroundColor: `${BLUE}10` }} />
 
                       {/* Items */}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold truncate" style={{ color: BLUE }}>
+                        <p className="text-xs sm:text-sm font-semibold truncate" style={{ color: BLUE }}>
                           {order.items.map(i =>
                             i.temperature ? `${i.displayName} (${i.temperature})` : i.displayName
                           ).join(' · ')}
@@ -166,7 +222,7 @@ export default function HistoryPage() {
 
                       {/* Total + chevron */}
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-base font-black" style={{ color: BLUE }}>
+                        <span className="text-sm sm:text-base font-black" style={{ color: BLUE }}>
                           RM{order.total}
                         </span>
                         <span
@@ -177,15 +233,13 @@ export default function HistoryPage() {
                             transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
                             transition: 'transform 0.15s',
                           }}
-                        >
-                          ▼
-                        </span>
+                        >▼</span>
                       </div>
                     </button>
 
                     {/* Expanded receipt */}
                     {isOpen && (
-                      <div className="px-6 pb-5 border-t" style={{ borderColor: `${BLUE}08` }}>
+                      <div className="px-4 sm:px-6 pb-5 border-t" style={{ borderColor: `${BLUE}08` }}>
                         <div className="pt-4 space-y-2 mb-3">
                           {order.items.map((item, i) => (
                             <div key={i} className="flex justify-between items-start text-sm">
@@ -196,9 +250,7 @@ export default function HistoryPage() {
                                     ({item.temperature})
                                   </span>
                                 )}
-                                <span className="ml-1 text-[11px]" style={{ color: `${BLUE}40` }}>
-                                  × {item.quantity}
-                                </span>
+                                <span className="ml-1 text-[11px]" style={{ color: `${BLUE}40` }}>× {item.quantity}</span>
                               </div>
                               <span className="font-bold shrink-0" style={{ color: BLUE }}>
                                 RM{item.price * item.quantity}
@@ -206,16 +258,9 @@ export default function HistoryPage() {
                             </div>
                           ))}
                         </div>
-                        <div
-                          className="border-t pt-3 flex justify-between items-baseline"
-                          style={{ borderColor: `${BLUE}10` }}
-                        >
-                          <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: `${BLUE}45` }}>
-                            Total
-                          </span>
-                          <span className="text-xl font-black" style={{ color: BLUE }}>
-                            RM{order.total}
-                          </span>
+                        <div className="border-t pt-3 flex justify-between items-baseline" style={{ borderColor: `${BLUE}10` }}>
+                          <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: `${BLUE}45` }}>Total</span>
+                          <span className="text-xl font-black" style={{ color: BLUE }}>RM{order.total}</span>
                         </div>
                       </div>
                     )}

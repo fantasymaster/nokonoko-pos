@@ -1,18 +1,30 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { usePOS } from '@/lib/pos-context'
 import type { CompletedOrder } from '@/lib/pos-types'
 
 const BLUE = '#1A28FF'
 const CREAM = '#F2EDE4'
 
+function useTodayDate(): Date {
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const id = setInterval(() => {
+      const d = new Date()
+      setNow(prev => prev.toDateString() !== d.toDateString() ? d : prev)
+    }, 60_000)
+    return () => clearInterval(id)
+  }, [])
+  return now
+}
+
 function isSameDay(a: Date, b: Date) {
   return a.toDateString() === b.toDateString()
 }
 
-function isWithinDays(date: Date, days: number) {
-  const cutoff = new Date()
+function isWithinDays(date: Date, days: number, ref: Date) {
+  const cutoff = new Date(ref)
   cutoff.setDate(cutoff.getDate() - days)
   return date >= cutoff
 }
@@ -20,7 +32,7 @@ function isWithinDays(date: Date, days: number) {
 function KPICard({ label, value, sub, highlight }: { label: string; value: string; sub: string; highlight?: boolean }) {
   return (
     <div
-      className="rounded-2xl p-5 flex flex-col gap-1"
+      className="rounded-2xl p-4 sm:p-5 flex flex-col gap-1"
       style={{ backgroundColor: highlight ? BLUE : 'white' }}
     >
       <p
@@ -30,7 +42,7 @@ function KPICard({ label, value, sub, highlight }: { label: string; value: strin
         {label}
       </p>
       <p
-        className="text-2xl font-black leading-tight"
+        className="text-xl sm:text-2xl font-black leading-tight"
         style={{ color: highlight ? CREAM : BLUE }}
       >
         {value}
@@ -52,7 +64,7 @@ function BarChart({
   todayIndex?: number
 }) {
   return (
-    <div className="flex items-end gap-1.5" style={{ height: 110 }}>
+    <div className="flex items-end gap-1" style={{ height: 100 }}>
       {bars.map((bar, i) => {
         const pct = maxVal > 0 ? Math.max(3, (bar.value / maxVal) * 100) : 3
         const isToday = i === todayIndex
@@ -65,11 +77,11 @@ function BarChart({
                 backgroundColor: bar.value > 0 ? (isToday ? BLUE : `${BLUE}45`) : `${BLUE}10`,
               }}
             />
-            <span className="text-[9px] font-semibold" style={{ color: `${BLUE}55` }}>
+            <span className="text-[8px] sm:text-[9px] font-semibold" style={{ color: `${BLUE}55` }}>
               {bar.label}
             </span>
             {bar.value > 0 && (
-              <span className="text-[8px]" style={{ color: `${BLUE}40` }}>
+              <span className="text-[7px] sm:text-[8px]" style={{ color: `${BLUE}40` }}>
                 {bar.sublabel ?? bar.value}
               </span>
             )}
@@ -82,23 +94,23 @@ function BarChart({
 
 export default function AnalyticsPage() {
   const { orders } = usePOS()
-  const now = new Date()
+  const now = useTodayDate()
 
   const todayOrders = useMemo(
     () => orders.filter(o => isSameDay(new Date(o.timestamp), now)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [orders]
+    [orders, now.toDateString()]
   )
   const weekOrders = useMemo(
-    () => orders.filter(o => isWithinDays(new Date(o.timestamp), 7)),
-    [orders]
+    () => orders.filter(o => isWithinDays(new Date(o.timestamp), 7, now)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [orders, now.toDateString()]
   )
 
   const todayRevenue = todayOrders.reduce((s, o) => s + o.total, 0)
   const weekRevenue = weekOrders.reduce((s, o) => s + o.total, 0)
   const avgOrder = weekOrders.length > 0 ? Math.round(weekRevenue / weekOrders.length) : 0
 
-  // Top items across all orders
   const topItems = useMemo(() => {
     const map: Record<string, { name: string; qty: number; revenue: number }> = {}
     orders.forEach(o =>
@@ -111,7 +123,6 @@ export default function AnalyticsPage() {
     return Object.values(map).sort((a, b) => b.qty - a.qty)
   }, [orders])
 
-  // Daily bars — last 7 days
   const dailyBars = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(now)
@@ -123,9 +134,8 @@ export default function AnalyticsPage() {
       return { label, value: revenue, sublabel: revenue > 0 ? `RM${revenue}` : undefined }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [weekOrders])
+  }, [weekOrders, now.toDateString()])
 
-  // Hourly bars — 8am–8pm, today or last 7 days
   const sourceOrders: CompletedOrder[] = todayOrders.length > 0 ? todayOrders : weekOrders
   const hourlyBars = useMemo(() => {
     return Array.from({ length: 13 }, (_, i) => {
@@ -143,13 +153,13 @@ export default function AnalyticsPage() {
   const maxHourly = Math.max(...hourlyBars.map(b => b.value), 1)
 
   return (
-    <div className="h-full overflow-y-auto p-8" style={{ backgroundColor: CREAM }}>
-      <h1 className="text-4xl font-black tracking-[-0.03em] mb-7" style={{ color: BLUE }}>
+    <div className="h-full overflow-y-auto p-4 sm:p-8" style={{ backgroundColor: CREAM }}>
+      <h1 className="text-3xl sm:text-4xl font-black tracking-[-0.03em] mb-6 sm:mb-7" style={{ color: BLUE }}>
         Analytics
       </h1>
 
-      {/* KPI row */}
-      <div className="grid grid-cols-4 gap-4 mb-7">
+      {/* KPI row — 2 cols mobile, 4 desktop */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-7">
         <KPICard
           label="Today's Revenue"
           value={`RM${todayRevenue}`}
@@ -173,17 +183,17 @@ export default function AnalyticsPage() {
         />
       </div>
 
-      {/* Charts row */}
-      <div className="grid grid-cols-2 gap-5 mb-5">
-        <div className="rounded-2xl p-6" style={{ backgroundColor: 'white' }}>
-          <p className="text-sm font-bold mb-5" style={{ color: BLUE }}>
+      {/* Charts — 1 col mobile, 2 desktop */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 mb-4 sm:mb-5">
+        <div className="rounded-2xl p-5 sm:p-6" style={{ backgroundColor: 'white' }}>
+          <p className="text-sm font-bold mb-4 sm:mb-5" style={{ color: BLUE }}>
             Daily Revenue — Last 7 Days
           </p>
           <BarChart bars={dailyBars} maxVal={maxDaily} todayIndex={6} />
         </div>
 
-        <div className="rounded-2xl p-6" style={{ backgroundColor: 'white' }}>
-          <p className="text-sm font-bold mb-5" style={{ color: BLUE }}>
+        <div className="rounded-2xl p-5 sm:p-6" style={{ backgroundColor: 'white' }}>
+          <p className="text-sm font-bold mb-4 sm:mb-5" style={{ color: BLUE }}>
             Peak Hours{todayOrders.length > 0 ? ' — Today' : ' — Last 7 Days'}
           </p>
           <BarChart bars={hourlyBars} maxVal={maxHourly} />
@@ -191,22 +201,18 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Top items */}
-      <div className="rounded-2xl p-6" style={{ backgroundColor: 'white' }}>
-        <p className="text-sm font-bold mb-5" style={{ color: BLUE }}>Top Items (All Time)</p>
+      <div className="rounded-2xl p-5 sm:p-6" style={{ backgroundColor: 'white' }}>
+        <p className="text-sm font-bold mb-4 sm:mb-5" style={{ color: BLUE }}>Top Items (All Time)</p>
         <div className="space-y-4">
           {topItems.map((item, i) => (
-            <div key={item.name} className="flex items-center gap-4">
+            <div key={item.name} className="flex items-center gap-3 sm:gap-4">
               <span className="text-sm font-black w-4 text-right shrink-0" style={{ color: `${BLUE}35` }}>
                 {i + 1}
               </span>
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-baseline mb-1.5">
-                  <span className="text-sm font-bold truncate" style={{ color: BLUE }}>
-                    {item.name}
-                  </span>
-                  <span className="text-sm font-black ml-4 shrink-0" style={{ color: BLUE }}>
-                    RM{item.revenue}
-                  </span>
+                  <span className="text-sm font-bold truncate" style={{ color: BLUE }}>{item.name}</span>
+                  <span className="text-sm font-black ml-3 shrink-0" style={{ color: BLUE }}>RM{item.revenue}</span>
                 </div>
                 <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: `${BLUE}10` }}>
                   <div
@@ -217,16 +223,12 @@ export default function AnalyticsPage() {
                     }}
                   />
                 </div>
-                <span className="text-[11px] mt-0.5 block" style={{ color: `${BLUE}45` }}>
-                  {item.qty} sold
-                </span>
+                <span className="text-[11px] mt-0.5 block" style={{ color: `${BLUE}45` }}>{item.qty} sold</span>
               </div>
             </div>
           ))}
           {topItems.length === 0 && (
-            <p className="text-sm text-center py-4" style={{ color: `${BLUE}35` }}>
-              No sales data yet
-            </p>
+            <p className="text-sm text-center py-4" style={{ color: `${BLUE}35` }}>No sales data yet</p>
           )}
         </div>
       </div>
