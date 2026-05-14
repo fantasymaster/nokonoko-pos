@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import type { MenuItem, CartItem, CompletedOrder, Temperature, OrderItem } from './pos-types'
+import type { MenuItem, CartItem, CompletedOrder, Temperature, Category } from './pos-types'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -37,6 +37,12 @@ export const INITIAL_MENU: MenuItem[] = [
   },
 ]
 
+interface PriceUpdate {
+  hotPrice?: number
+  icedPrice?: number
+  fixedPrice?: number
+}
+
 interface POSContextType {
   menu: MenuItem[]
   cart: CartItem[]
@@ -47,10 +53,30 @@ interface POSContextType {
   clearCart: () => void
   checkout: () => Promise<CompletedOrder | null>
   updateStock: (itemId: string, delta: number) => void
+  updatePrice: (itemId: string, prices: PriceUpdate) => Promise<void>
+  addMenuItem: (item: Omit<MenuItem, 'id'>) => Promise<void>
   nextOrderNumber: number
 }
 
 const POSContext = createContext<POSContextType | null>(null)
+
+// Extended row type returned after migration
+type MenuRow = {
+  id: string
+  stock: number
+  name?: string | null
+  modifier?: string | null
+  description?: string | null
+  category?: string | null
+  has_temperature?: boolean | null
+  hot_price?: number | null
+  iced_price?: number | null
+  fixed_price?: number | null
+  unit?: string | null
+  low_stock_threshold?: number | null
+  is_custom?: boolean | null
+  sort_order?: number | null
+}
 
 export function POSProvider({ children }: { children: ReactNode }) {
   const [menu, setMenu] = useState<MenuItem[]>(INITIAL_MENU)
@@ -103,19 +129,72 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }
 
   async function loadStock() {
-    const { data } = await supabase.from('menu_items').select('id, stock')
+    // Try extended schema first (post-migration with price + custom item columns)
+    const { data, error } = await supabase
+      .from('menu_items')
+      .select('id, stock, name, modifier, description, category, has_temperature, hot_price, iced_price, fixed_price, unit, low_stock_threshold, is_custom, sort_order')
 
-    if (data && data.length > 0) {
-      setMenu(prev => prev.map(item => {
-        const row = data.find((r: { id: string; stock: number }) => r.id === item.id)
-        return row ? { ...item, stock: row.stock } : item
-      }))
-    } else {
-      // First boot — seed stock into Supabase
-      await supabase.from('menu_items').insert(
-        INITIAL_MENU.map(item => ({ id: item.id, stock: item.stock }))
-      )
+    if (error) {
+      // Pre-migration fallback — columns don't exist yet, use basic stock only
+      const { data: basic } = await supabase.from('menu_items').select('id, stock')
+      if (basic && basic.length > 0) {
+        setMenu(prev => prev.map(item => {
+          const row = basic.find((r: { id: string; stock: number }) => r.id === item.id)
+          return row ? { ...item, stock: row.stock } : item
+        }))
+      } else {
+        await supabase.from('menu_items').insert(
+          INITIAL_MENU.map(item => ({ id: item.id, stock: item.stock }))
+        )
+      }
+      return
     }
+
+    if (!data || data.length === 0) {
+      // First boot after migration — seed with stock + sort order
+      await supabase.from('menu_items').insert(
+        INITIAL_MENU.map((item, i) => ({ id: item.id, stock: item.stock, sort_order: i }))
+      )
+      return
+    }
+
+    const rows = data as MenuRow[]
+
+    setMenu(() => {
+      // Update initial items with stock + optional price overrides from Supabase
+      const updated = INITIAL_MENU.map(item => {
+        const row = rows.find(r => r.id === item.id && !r.is_custom)
+        if (!row) return item
+        return {
+          ...item,
+          stock: row.stock,
+          hotPrice: row.hot_price ?? item.hotPrice,
+          icedPrice: row.iced_price ?? item.icedPrice,
+          fixedPrice: row.fixed_price ?? item.fixedPrice,
+        }
+      })
+
+      // Append custom items (sorted by sort_order)
+      const custom: MenuItem[] = rows
+        .filter(r => r.is_custom && r.name)
+        .sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100))
+        .map(r => ({
+          id: r.id,
+          name: r.name!,
+          modifier: r.modifier ?? undefined,
+          description: r.description ?? undefined,
+          category: (r.category ?? 'specialty') as Category,
+          hasTemperature: r.has_temperature ?? false,
+          hotPrice: r.hot_price ?? undefined,
+          icedPrice: r.iced_price ?? undefined,
+          fixedPrice: r.fixed_price ?? undefined,
+          stock: r.stock,
+          unit: r.unit ?? 'cups',
+          lowStockThreshold: r.low_stock_threshold ?? 10,
+        }))
+
+      return [...updated, ...custom]
+    })
   }
 
   const addToCart = useCallback((item: MenuItem, temp?: Temperature) => {
@@ -147,7 +226,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const orderId = `N-${String(nextOrderNumber).padStart(4, '0')}`
     const timestamp = new Date().toISOString()
 
-    // Insert order row
     const { error: orderErr } = await supabase.from('orders').insert({
       id: orderId,
       order_number: nextOrderNumber,
@@ -157,7 +235,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
     })
     if (orderErr) { console.error('Order insert failed:', orderErr); return null }
 
-    // Insert line items
     await supabase.from('order_items').insert(
       cart.map(c => ({
         order_id: orderId,
@@ -169,7 +246,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
       }))
     )
 
-    // Decrement stock in Supabase
     for (const c of cart) {
       const item = menu.find(m => m.id === c.menuItemId)
       if (!item) continue
@@ -194,7 +270,6 @@ export function POSProvider({ children }: { children: ReactNode }) {
       timestamp,
     }
 
-    // Optimistic local update
     setOrders(prev => [order, ...prev])
     setNextOrderNumber(n => n + 1)
     setMenu(prev => prev.map(item => {
@@ -213,8 +288,46 @@ export function POSProvider({ children }: { children: ReactNode }) {
     await supabase.from('menu_items').update({ stock: newStock }).eq('id', itemId)
   }, [menu])
 
+  const updatePrice = useCallback(async (itemId: string, prices: PriceUpdate) => {
+    setMenu(prev => prev.map(m => m.id === itemId ? { ...m, ...prices } : m))
+    const update: Record<string, number> = {}
+    if (prices.hotPrice !== undefined) update.hot_price = prices.hotPrice
+    if (prices.icedPrice !== undefined) update.iced_price = prices.icedPrice
+    if (prices.fixedPrice !== undefined) update.fixed_price = prices.fixedPrice
+    if (Object.keys(update).length > 0) {
+      await supabase.from('menu_items').update(update).eq('id', itemId)
+    }
+  }, [])
+
+  const addMenuItem = useCallback(async (item: Omit<MenuItem, 'id'>) => {
+    const id = `custom-${Date.now()}`
+    const full: MenuItem = { ...item, id }
+    setMenu(prev => [...prev, full])
+    await supabase.from('menu_items').insert({
+      id,
+      stock: full.stock,
+      name: full.name,
+      modifier: full.modifier ?? null,
+      description: full.description ?? null,
+      category: full.category,
+      has_temperature: full.hasTemperature,
+      hot_price: full.hotPrice ?? null,
+      iced_price: full.icedPrice ?? null,
+      fixed_price: full.fixedPrice ?? null,
+      unit: full.unit,
+      low_stock_threshold: full.lowStockThreshold,
+      is_custom: true,
+      sort_order: 100 + (menu.length - INITIAL_MENU.length),
+    })
+  }, [menu])
+
   return (
-    <POSContext.Provider value={{ menu, cart, orders, loading, addToCart, updateQty, clearCart, checkout, updateStock, nextOrderNumber }}>
+    <POSContext.Provider value={{
+      menu, cart, orders, loading,
+      addToCart, updateQty, clearCart, checkout,
+      updateStock, updatePrice, addMenuItem,
+      nextOrderNumber,
+    }}>
       {children}
     </POSContext.Provider>
   )
