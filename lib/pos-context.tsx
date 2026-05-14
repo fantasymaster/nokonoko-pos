@@ -51,7 +51,7 @@ interface POSContextType {
   addToCart: (item: MenuItem, temp?: Temperature) => void
   updateQty: (cartId: string, delta: number) => void
   clearCart: () => void
-  checkout: () => Promise<CompletedOrder | null>
+  checkout: (customerName?: string) => Promise<CompletedOrder | null>
   cancelOrder: (order: CompletedOrder) => Promise<void>
   updateStock: (itemId: string, delta: number) => void
   updatePrice: (itemId: string, prices: PriceUpdate) => Promise<void>
@@ -97,7 +97,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   async function loadOrders() {
     const { data, error } = await supabase
       .from('orders')
-      .select(`id, order_number, subtotal, total, timestamp, order_items(menu_item_id, display_name, temperature, price, quantity)`)
+      .select(`id, order_number, customer_name, subtotal, total, timestamp, order_items(menu_item_id, display_name, temperature, price, quantity)`)
       .order('timestamp', { ascending: false })
 
     if (error || !data) return
@@ -105,6 +105,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const mapped: CompletedOrder[] = data.map((o: {
       id: string
       order_number: number
+      customer_name?: string | null
       subtotal: number
       total: number
       timestamp: string
@@ -112,6 +113,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }) => ({
       id: o.id,
       orderNumber: o.order_number,
+      customerName: o.customer_name ?? undefined,
       subtotal: o.subtotal,
       total: o.total,
       timestamp: o.timestamp,
@@ -220,7 +222,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const clearCart = useCallback(() => setCart([]), [])
 
-  const checkout = useCallback(async (): Promise<CompletedOrder | null> => {
+  const checkout = useCallback(async (customerName?: string): Promise<CompletedOrder | null> => {
     if (cart.length === 0) return null
 
     const total = cart.reduce((s, c) => s + c.price * c.quantity, 0)
@@ -230,6 +232,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const { error: orderErr } = await supabase.from('orders').insert({
       id: orderId,
       order_number: nextOrderNumber,
+      customer_name: customerName || null,
       subtotal: total,
       total,
       timestamp,
@@ -259,6 +262,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const order: CompletedOrder = {
       id: orderId,
       orderNumber: nextOrderNumber,
+      customerName: customerName || undefined,
       items: cart.map(c => ({
         menuItemId: c.menuItemId,
         displayName: c.displayName,

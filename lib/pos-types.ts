@@ -36,6 +36,7 @@ export interface OrderItem {
 export interface CompletedOrder {
   id: string
   orderNumber: number
+  customerName?: string
   items: OrderItem[]
   subtotal: number
   total: number

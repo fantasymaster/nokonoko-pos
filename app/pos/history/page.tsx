@@ -90,6 +90,7 @@ export default function HistoryPage() {
       .filter(o =>
         q === '' ||
         o.id.toLowerCase().includes(q) ||
+        (o.customerName ?? '').toLowerCase().includes(q) ||
         o.items.some(i => i.displayName.toLowerCase().includes(q))
       )
     const groups = groupByDate(sorted, today)
@@ -217,6 +218,9 @@ export default function HistoryPage() {
                         </p>
                         <p className="text-xs mt-0.5" style={{ color: `${BLUE}45` }}>
                           {itemCount} item{itemCount !== 1 ? 's' : ''}
+                          {order.customerName && (
+                            <> · <span className="font-semibold" style={{ color: BLUE }}>{order.customerName}</span></>
+                          )}
                         </p>
                       </div>
 

@@ -6,10 +6,14 @@
 create table if not exists public.orders (
   id             text        primary key,
   order_number   integer     not null,
+  customer_name  text,
   subtotal       integer     not null,
   total          integer     not null,
   timestamp      timestamptz not null default now()
 );
+
+-- Migration: add customer_name if not present (safe to re-run)
+alter table public.orders add column if not exists customer_name text;
 
 create table if not exists public.order_items (
   id             uuid        primary key default gen_random_uuid(),

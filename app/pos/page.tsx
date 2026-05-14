@@ -64,8 +64,13 @@ function Receipt({ order, onClose, onCancel }: { order: CompletedOrder; onClose:
           <div className="text-[11px] text-gray-400">{timeStr}</div>
         </div>
         <div className="px-8 pt-4">
-          <div className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: `${BLUE}50` }}>
-            {order.id}
+          <div className="flex items-baseline justify-between mb-3">
+            <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: `${BLUE}50` }}>
+              {order.id}
+            </div>
+            {order.customerName && (
+              <div className="text-sm font-black" style={{ color: BLUE }}>{order.customerName}</div>
+            )}
           </div>
           <div className="space-y-2.5 mb-4">
             {order.items.map((item, i) => (
@@ -237,7 +242,7 @@ export default function POSPage() {
 
   const handleCharge = async () => {
     setCharging(true)
-    const order = await checkout()
+    const order = await checkout(customerName || undefined)
     setCharging(false)
     if (order) {
       playCheckoutSound()
