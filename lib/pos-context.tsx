@@ -56,6 +56,7 @@ interface POSContextType {
   updateStock: (itemId: string, delta: number) => void
   updatePrice: (itemId: string, prices: PriceUpdate) => Promise<void>
   addMenuItem: (item: Omit<MenuItem, 'id'>) => Promise<void>
+  updateMenuItem: (id: string, updates: Omit<MenuItem, 'id'>) => Promise<void>
   nextOrderNumber: number
 }
 
@@ -316,6 +317,23 @@ export function POSProvider({ children }: { children: ReactNode }) {
     setOrders(prev => prev.filter(o => o.id !== order.id))
   }, [menu])
 
+  const updateMenuItem = useCallback(async (id: string, updates: Omit<MenuItem, 'id'>) => {
+    setMenu(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m))
+    await supabase.from('menu_items').update({
+      name: updates.name,
+      modifier: updates.modifier ?? null,
+      description: updates.description ?? null,
+      category: updates.category,
+      has_temperature: updates.hasTemperature,
+      hot_price: updates.hotPrice ?? null,
+      iced_price: updates.icedPrice ?? null,
+      fixed_price: updates.fixedPrice ?? null,
+      stock: updates.stock,
+      unit: updates.unit,
+      low_stock_threshold: updates.lowStockThreshold,
+    }).eq('id', id)
+  }, [])
+
   const addMenuItem = useCallback(async (item: Omit<MenuItem, 'id'>) => {
     const id = `custom-${Date.now()}`
     const full: MenuItem = { ...item, id }
@@ -342,7 +360,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     <POSContext.Provider value={{
       menu, cart, orders, loading,
       addToCart, updateQty, clearCart, checkout, cancelOrder,
-      updateStock, updatePrice, addMenuItem,
+      updateStock, updatePrice, addMenuItem, updateMenuItem,
       nextOrderNumber,
     }}>
       {children}
