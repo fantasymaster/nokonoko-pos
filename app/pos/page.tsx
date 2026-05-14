@@ -7,7 +7,47 @@ import type { CompletedOrder } from '@/lib/pos-types'
 const BLUE = '#1A28FF'
 const CREAM = '#F2EDE4'
 
-function Receipt({ order, onClose }: { order: CompletedOrder; onClose: () => void }) {
+function playAddSound() {
+  try {
+    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(700, ctx.currentTime)
+    osc.frequency.exponentialRampToValueAtTime(1050, ctx.currentTime + 0.07)
+    gain.gain.setValueAtTime(0.18, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12)
+    osc.start(ctx.currentTime)
+    osc.stop(ctx.currentTime + 0.12)
+    osc.onended = () => ctx.close()
+  } catch {}
+}
+
+function playCheckoutSound() {
+  try {
+    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
+    const freqs = [523, 659, 784]
+    freqs.forEach((freq, i) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.type = 'sine'
+      osc.frequency.value = freq
+      const t = ctx.currentTime + i * 0.08
+      gain.gain.setValueAtTime(0, t)
+      gain.gain.linearRampToValueAtTime(0.15, t + 0.04)
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35)
+      osc.start(t)
+      osc.stop(t + 0.35)
+      if (i === freqs.length - 1) osc.onended = () => ctx.close()
+    })
+  } catch {}
+}
+
+function Receipt({ order, onClose, onCancel }: { order: CompletedOrder; onClose: () => void; onCancel: () => void }) {
   const date = new Date(order.timestamp)
   const dateStr = date.toLocaleDateString('en-MY', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
   const timeStr = date.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' })
@@ -47,7 +87,7 @@ function Receipt({ order, onClose }: { order: CompletedOrder; onClose: () => voi
           </div>
           <div className="text-center text-[11px] text-gray-300 py-3">Thank you! Come again.</div>
         </div>
-        <div className="px-8 pb-8">
+        <div className="px-8 pb-8 space-y-2.5">
           <button
             onClick={onClose}
             className="w-full py-3.5 rounded-2xl text-sm font-black tracking-tight transition-all hover:opacity-90 active:scale-[0.98]"
@@ -55,16 +95,25 @@ function Receipt({ order, onClose }: { order: CompletedOrder; onClose: () => voi
           >
             New Order
           </button>
+          <button
+            onClick={onCancel}
+            className="w-full py-3 rounded-2xl text-sm font-bold tracking-tight transition-all hover:opacity-70 active:scale-[0.98]"
+            style={{ color: '#EF4444', backgroundColor: 'transparent' }}
+          >
+            Cancel Order
+          </button>
         </div>
       </div>
     </div>
   )
 }
 
-function OrderPanel({ onCharge, charging, onClose }: {
+function OrderPanel({ onCharge, charging, onClose, customerName, onCustomerNameChange }: {
   onCharge: () => void
   charging: boolean
   onClose?: () => void
+  customerName: string
+  onCustomerNameChange: (name: string) => void
 }) {
   const { cart, updateQty, clearCart, nextOrderNumber } = usePOS()
   const total = cart.reduce((s, c) => s + c.price * c.quantity, 0)
@@ -131,6 +180,23 @@ function OrderPanel({ onCharge, charging, onClose }: {
         )}
       </div>
 
+      {/* Customer name */}
+      <div className="px-6 pb-3 pt-4 border-t" style={{ borderColor: `${BLUE}15` }}>
+        <input
+          type="text"
+          value={customerName}
+          onChange={e => onCustomerNameChange(e.target.value)}
+          placeholder="Customer name"
+          className="w-full rounded-2xl text-base font-medium outline-none transition-all"
+          style={{
+            padding: '14px 16px',
+            backgroundColor: `${BLUE}08`,
+            color: BLUE,
+            border: `1.5px solid ${customerName ? `${BLUE}40` : `${BLUE}15`}`,
+          }}
+        />
+      </div>
+
       {/* Total + charge */}
       {cart.length > 0 && (
         <div className="px-6 py-5 border-t space-y-3" style={{ borderColor: `${BLUE}15` }}>
@@ -160,10 +226,11 @@ function OrderPanel({ onCharge, charging, onClose }: {
 }
 
 export default function POSPage() {
-  const { menu, cart, addToCart, checkout } = usePOS()
+  const { menu, cart, addToCart, checkout, cancelOrder } = usePOS()
   const [completedOrder, setCompletedOrder] = useState<CompletedOrder | null>(null)
   const [charging, setCharging] = useState(false)
   const [showMobileCart, setShowMobileCart] = useState(false)
+  const [customerName, setCustomerName] = useState('')
 
   const total = cart.reduce((s, c) => s + c.price * c.quantity, 0)
   const itemCount = cart.reduce((s, c) => s + c.quantity, 0)
@@ -173,8 +240,10 @@ export default function POSPage() {
     const order = await checkout()
     setCharging(false)
     if (order) {
+      playCheckoutSound()
       setShowMobileCart(false)
       setCompletedOrder(order)
+      setCustomerName('')
     }
   }
 
@@ -233,7 +302,7 @@ export default function POSPage() {
                           </span>
                           <div className="flex gap-1.5 sm:gap-2">
                             <button
-                              onClick={() => addToCart(item, 'hot')}
+                              onClick={() => { addToCart(item, 'hot'); playAddSound() }}
                               disabled={isOut}
                               className="px-3 sm:px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-bold transition-all hover:opacity-80 active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed"
                               style={{ backgroundColor: BLUE, color: CREAM }}
@@ -241,7 +310,7 @@ export default function POSPage() {
                               Hot&nbsp;RM{item.hotPrice}
                             </button>
                             <button
-                              onClick={() => addToCart(item, 'iced')}
+                              onClick={() => { addToCart(item, 'iced'); playAddSound() }}
                               disabled={isOut}
                               className="px-3 sm:px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-bold transition-all hover:opacity-80 active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed"
                               style={{ border: `2px solid ${BLUE}`, color: BLUE, backgroundColor: 'transparent' }}
@@ -252,7 +321,7 @@ export default function POSPage() {
                         </>
                       ) : (
                         <button
-                          onClick={() => addToCart(item)}
+                          onClick={() => { addToCart(item); playAddSound() }}
                           disabled={isOut}
                           className="mt-3 sm:mt-4 px-4 sm:px-6 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-bold transition-all hover:opacity-80 active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed"
                           style={{ backgroundColor: BLUE, color: CREAM }}
@@ -276,7 +345,7 @@ export default function POSPage() {
 
         {/* ── Desktop Order Panel ─────────────────────────────── */}
         <div className="hidden md:flex w-[300px] shrink-0 flex-col border-l" style={{ borderColor: `${BLUE}15` }}>
-          <OrderPanel onCharge={handleCharge} charging={charging} />
+          <OrderPanel onCharge={handleCharge} charging={charging} customerName={customerName} onCustomerNameChange={setCustomerName} />
         </div>
       </div>
 
@@ -316,13 +385,22 @@ export default function POSPage() {
               onCharge={handleCharge}
               charging={charging}
               onClose={() => setShowMobileCart(false)}
+              customerName={customerName}
+              onCustomerNameChange={setCustomerName}
             />
           </div>
         </div>
       )}
 
       {completedOrder && (
-        <Receipt order={completedOrder} onClose={() => setCompletedOrder(null)} />
+        <Receipt
+          order={completedOrder}
+          onClose={() => setCompletedOrder(null)}
+          onCancel={async () => {
+            await cancelOrder(completedOrder)
+            setCompletedOrder(null)
+          }}
+        />
       )}
     </>
   )
