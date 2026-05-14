@@ -9,7 +9,7 @@ const CREAM = '#F2EDE4'
 function POSShell({ children }: { children: React.ReactNode }) {
   const { loading } = usePOS()
   return (
-    <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: CREAM }}>
+    <div className="flex flex-col h-full" style={{ backgroundColor: CREAM }}>
       <POSNav />
       <div className="flex-1 overflow-hidden relative">
         {children}

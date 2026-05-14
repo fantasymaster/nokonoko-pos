@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Sidebar } from "@/components/sidebar";
-import { TooltipProvider } from "@/components/ui/tooltip";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Content Dashboard",
-  description: "Manage your content, analytics, and social media presence",
+  title: "nokonoko POS",
+  description: "Point of sale system for nokonoko café",
 };
 
 export default function RootLayout({
@@ -27,17 +25,10 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="h-full bg-background text-foreground">
-        <TooltipProvider>
-          <div className="flex h-full">
-            <Sidebar />
-            <main className="flex-1 overflow-y-auto">
-              {children}
-            </main>
-          </div>
-        </TooltipProvider>
+      <body className="h-full">
+        {children}
       </body>
     </html>
   );
