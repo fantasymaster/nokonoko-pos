@@ -80,12 +80,34 @@ type MenuRow = {
   sort_order?: number | null
 }
 
+// ── Local storage helpers ─────────────────────────────────────────────────────
+const LS_ORDERS_KEY = 'noko_orders_v1'
+
+function lsLoadOrders(): CompletedOrder[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = localStorage.getItem(LS_ORDERS_KEY)
+    return raw ? (JSON.parse(raw) as CompletedOrder[]) : []
+  } catch { return [] }
+}
+
+function lsSaveOrders(orders: CompletedOrder[]) {
+  if (typeof window === 'undefined') return
+  try { localStorage.setItem(LS_ORDERS_KEY, JSON.stringify(orders)) } catch {}
+}
+
 export function POSProvider({ children }: { children: ReactNode }) {
   const [menu, setMenu] = useState<MenuItem[]>(INITIAL_MENU)
   const [cart, setCart] = useState<CartItem[]>([])
   const [orders, setOrders] = useState<CompletedOrder[]>([])
   const [nextOrderNumber, setNextOrderNumber] = useState(1)
   const [loading, setLoading] = useState(true)
+
+  // Persist orders to localStorage whenever they change (after initial load)
+  const [ordersReady, setOrdersReady] = useState(false)
+  useEffect(() => {
+    if (ordersReady) lsSaveOrders(orders)
+  }, [orders, ordersReady])
 
   useEffect(() => { loadAll() }, [])
 
@@ -106,9 +128,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
       order_items: { menu_item_id: string; display_name: string; temperature: string | null; price: number; quantity: number }[]
     }
 
-    // Try with customer_name first (post-migration)
+    // Try Supabase with customer_name first (post-migration)
     let rows: OrderRow[] | null = null
     let hasCustomerName = true
+    let supabaseOk = false
 
     const { data: d1, error: e1 } = await supabase
       .from('orders')
@@ -117,6 +140,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
     if (!e1) {
       rows = d1 as OrderRow[]
+      supabaseOk = true
     } else {
       // Pre-migration fallback — customer_name column doesn't exist yet
       hasCustomerName = false
@@ -124,31 +148,42 @@ export function POSProvider({ children }: { children: ReactNode }) {
         .from('orders')
         .select(`id, order_number, subtotal, total, timestamp, order_items(menu_item_id, display_name, temperature, price, quantity)`)
         .order('timestamp', { ascending: false })
-      if (e2 || !d2) return
-      rows = d2 as OrderRow[]
+      if (!e2) {
+        rows = d2 as OrderRow[]
+        supabaseOk = true
+      }
     }
 
-    if (!rows) return
+    if (supabaseOk && rows && rows.length > 0) {
+      // Supabase has data — use it and sync to localStorage
+      const mapped: CompletedOrder[] = rows.map(o => ({
+        id: o.id,
+        orderNumber: o.order_number,
+        customerName: hasCustomerName ? (o.customer_name ?? undefined) : undefined,
+        subtotal: o.subtotal,
+        total: o.total,
+        timestamp: o.timestamp,
+        items: o.order_items.map(i => ({
+          menuItemId: i.menu_item_id,
+          displayName: i.display_name,
+          temperature: (i.temperature ?? undefined) as Temperature | undefined,
+          price: i.price,
+          quantity: i.quantity,
+        })),
+      }))
+      lsSaveOrders(mapped)
+      setOrders(mapped)
+      const maxNum = mapped.reduce((m, o) => Math.max(m, o.orderNumber), 0)
+      setNextOrderNumber(maxNum + 1)
+    } else {
+      // Supabase unavailable or empty — load from localStorage
+      const local = lsLoadOrders()
+      setOrders(local)
+      const maxNum = local.reduce((m, o) => Math.max(m, o.orderNumber), 0)
+      setNextOrderNumber(maxNum + 1)
+    }
 
-    const mapped: CompletedOrder[] = rows.map(o => ({
-      id: o.id,
-      orderNumber: o.order_number,
-      customerName: hasCustomerName ? (o.customer_name ?? undefined) : undefined,
-      subtotal: o.subtotal,
-      total: o.total,
-      timestamp: o.timestamp,
-      items: o.order_items.map(i => ({
-        menuItemId: i.menu_item_id,
-        displayName: i.display_name,
-        temperature: (i.temperature ?? undefined) as Temperature | undefined,
-        price: i.price,
-        quantity: i.quantity,
-      })),
-    }))
-
-    setOrders(mapped)
-    const maxNum = mapped.reduce((m, o) => Math.max(m, o.orderNumber), 0)
-    setNextOrderNumber(maxNum + 1)
+    setOrdersReady(true)
   }
 
   async function loadStock() {
