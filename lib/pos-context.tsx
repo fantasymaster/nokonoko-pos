@@ -220,18 +220,19 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const rows = data as MenuRow[]
 
     setMenu(() => {
-      // Update initial items with stock + optional price overrides from Supabase
-      const updated = INITIAL_MENU.map(item => {
-        const row = rows.find(r => r.id === item.id && !r.is_custom)
-        if (!row) return item
-        return {
-          ...item,
-          stock: row.stock,
-          hotPrice: row.hot_price ?? item.hotPrice,
-          icedPrice: row.iced_price ?? item.icedPrice,
-          fixedPrice: row.fixed_price ?? item.fixedPrice,
-        }
-      })
+      // Only include initial items that still exist in Supabase (deleted items stay gone)
+      const updated = INITIAL_MENU
+        .filter(item => rows.some(r => r.id === item.id && !r.is_custom))
+        .map(item => {
+          const row = rows.find(r => r.id === item.id && !r.is_custom)!
+          return {
+            ...item,
+            stock: row.stock,
+            hotPrice: row.hot_price ?? item.hotPrice,
+            icedPrice: row.iced_price ?? item.icedPrice,
+            fixedPrice: row.fixed_price ?? item.fixedPrice,
+          }
+        })
 
       // Append custom items (sorted by sort_order)
       const custom: MenuItem[] = rows
