@@ -243,52 +243,16 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const orderId = `N-${String(nextOrderNumber).padStart(4, '0')}`
     const timestamp = new Date().toISOString()
 
-    let { error: orderErr } = await supabase.from('orders').insert({
-      id: orderId,
-      order_number: nextOrderNumber,
-      customer_name: customerName || null,
-      subtotal: total,
-      total,
-      timestamp,
-    })
-    if (orderErr) {
-      // Pre-migration fallback — customer_name column may not exist yet
-      const result = await supabase.from('orders').insert({
-        id: orderId,
-        order_number: nextOrderNumber,
-        subtotal: total,
-        total,
-        timestamp,
-      })
-      orderErr = result.error
-      if (orderErr) { console.error('Order insert failed:', orderErr); return null }
-    }
+    // Capture snapshots before clearing state
+    const cartSnapshot = [...cart]
+    const menuSnapshot = [...menu]
 
-    await supabase.from('order_items').insert(
-      cart.map(c => ({
-        order_id: orderId,
-        menu_item_id: c.menuItemId,
-        display_name: c.displayName,
-        temperature: c.temperature ?? null,
-        price: c.price,
-        quantity: c.quantity,
-      }))
-    )
-
-    for (const c of cart) {
-      const item = menu.find(m => m.id === c.menuItemId)
-      if (!item) continue
-      await supabase
-        .from('menu_items')
-        .update({ stock: Math.max(0, item.stock - c.quantity) })
-        .eq('id', c.menuItemId)
-    }
-
+    // ── Build order object ────────────────────────────────────────────────────
     const order: CompletedOrder = {
       id: orderId,
       orderNumber: nextOrderNumber,
       customerName: customerName || undefined,
-      items: cart.map(c => ({
+      items: cartSnapshot.map(c => ({
         menuItemId: c.menuItemId,
         displayName: c.displayName,
         temperature: c.temperature,
@@ -300,13 +264,59 @@ export function POSProvider({ children }: { children: ReactNode }) {
       timestamp,
     }
 
+    // ── Optimistic local update — receipt shows immediately ───────────────────
     setOrders(prev => [order, ...prev])
     setNextOrderNumber(n => n + 1)
     setMenu(prev => prev.map(item => {
-      const used = cart.filter(c => c.menuItemId === item.id).reduce((s, c) => s + c.quantity, 0)
+      const used = cartSnapshot.filter(c => c.menuItemId === item.id).reduce((s, c) => s + c.quantity, 0)
       return used > 0 ? { ...item, stock: Math.max(0, item.stock - used) } : item
     }))
     setCart([])
+
+    // ── Persist to Supabase in background (non-blocking) ─────────────────────
+    ;(async () => {
+      // Try insert with customer_name; fall back without it if column missing
+      let { error: orderErr } = await supabase.from('orders').insert({
+        id: orderId,
+        order_number: order.orderNumber,
+        customer_name: customerName || null,
+        subtotal: total,
+        total,
+        timestamp,
+      })
+      if (orderErr) {
+        const result = await supabase.from('orders').insert({
+          id: orderId,
+          order_number: order.orderNumber,
+          subtotal: total,
+          total,
+          timestamp,
+        })
+        orderErr = result.error
+        if (orderErr) { console.error('Order sync failed:', orderErr.message); return }
+      }
+
+      await supabase.from('order_items').insert(
+        cartSnapshot.map(c => ({
+          order_id: orderId,
+          menu_item_id: c.menuItemId,
+          display_name: c.displayName,
+          temperature: c.temperature ?? null,
+          price: c.price,
+          quantity: c.quantity,
+        }))
+      )
+
+      for (const c of cartSnapshot) {
+        const item = menuSnapshot.find(m => m.id === c.menuItemId)
+        if (!item) continue
+        await supabase
+          .from('menu_items')
+          .update({ stock: Math.max(0, item.stock - c.quantity) })
+          .eq('id', c.menuItemId)
+      }
+    })()
+
     return order
   }, [cart, nextOrderNumber, menu])
 
