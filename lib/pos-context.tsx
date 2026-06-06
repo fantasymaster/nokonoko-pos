@@ -96,27 +96,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }
 
   async function loadOrders() {
-    // Try with customer_name first (post-migration)
-    let { data, error } = await supabase
-      .from('orders')
-      .select(`id, order_number, customer_name, subtotal, total, timestamp, order_items(menu_item_id, display_name, temperature, price, quantity)`)
-      .order('timestamp', { ascending: false })
-
-    let hasCustomerName = true
-    if (error) {
-      // Pre-migration fallback — customer_name column doesn't exist yet
-      hasCustomerName = false
-      const result = await supabase
-        .from('orders')
-        .select(`id, order_number, subtotal, total, timestamp, order_items(menu_item_id, display_name, temperature, price, quantity)`)
-        .order('timestamp', { ascending: false })
-      data = result.data
-      error = result.error
-    }
-
-    if (error || !data) return
-
-    const mapped: CompletedOrder[] = data.map((o: {
+    type OrderRow = {
       id: string
       order_number: number
       customer_name?: string | null
@@ -124,7 +104,33 @@ export function POSProvider({ children }: { children: ReactNode }) {
       total: number
       timestamp: string
       order_items: { menu_item_id: string; display_name: string; temperature: string | null; price: number; quantity: number }[]
-    }) => ({
+    }
+
+    // Try with customer_name first (post-migration)
+    let rows: OrderRow[] | null = null
+    let hasCustomerName = true
+
+    const { data: d1, error: e1 } = await supabase
+      .from('orders')
+      .select(`id, order_number, customer_name, subtotal, total, timestamp, order_items(menu_item_id, display_name, temperature, price, quantity)`)
+      .order('timestamp', { ascending: false })
+
+    if (!e1) {
+      rows = d1 as OrderRow[]
+    } else {
+      // Pre-migration fallback — customer_name column doesn't exist yet
+      hasCustomerName = false
+      const { data: d2, error: e2 } = await supabase
+        .from('orders')
+        .select(`id, order_number, subtotal, total, timestamp, order_items(menu_item_id, display_name, temperature, price, quantity)`)
+        .order('timestamp', { ascending: false })
+      if (e2 || !d2) return
+      rows = d2 as OrderRow[]
+    }
+
+    if (!rows) return
+
+    const mapped: CompletedOrder[] = rows.map(o => ({
       id: o.id,
       orderNumber: o.order_number,
       customerName: hasCustomerName ? (o.customer_name ?? undefined) : undefined,
