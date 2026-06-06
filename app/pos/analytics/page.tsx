@@ -92,6 +92,160 @@ function BarChart({
   )
 }
 
+// ── Export helpers ─────────────────────────────────────────────────────────
+
+function exportAnalyticsCSV(params: {
+  now: Date
+  todayRevenue: number
+  todayCount: number
+  weekRevenue: number
+  weekCount: number
+  avgOrder: number
+  topItems: { name: string; qty: number; revenue: number }[]
+  dailyBars: { label: string; value: number }[]
+  hourlyBars: { label: string; value: number }[]
+}) {
+  const dateStr = params.now.toLocaleDateString('en-MY', { day: '2-digit', month: 'long', year: 'numeric' })
+  const rows: (string | number)[][] = [
+    [`nokonoko™ Analytics — ${dateStr}`],
+    [],
+    ['SUMMARY'],
+    ["Today's Revenue", `RM${params.todayRevenue}`, `${params.todayCount} orders`],
+    ['Week Revenue', `RM${params.weekRevenue}`, `${params.weekCount} orders`],
+    ['Avg Order Value', `RM${params.avgOrder}`],
+    ['Best Seller', params.topItems[0]?.name ?? '—', params.topItems[0] ? `${params.topItems[0].qty} sold` : ''],
+    [],
+    ['DAILY REVENUE — LAST 7 DAYS'],
+    ['Day', 'Revenue (RM)'],
+    ...params.dailyBars.map(b => [b.label, b.value]),
+    [],
+    ['TOP ITEMS (ALL TIME)'],
+    ['Rank', 'Item', 'Qty Sold', 'Revenue (RM)'],
+    ...params.topItems.map((item, i) => [i + 1, item.name, item.qty, item.revenue]),
+    [],
+    ['PEAK HOURS'],
+    ['Hour', 'Revenue (RM)'],
+    ...params.hourlyBars.filter(b => b.value > 0).map(b => [b.label, b.value]),
+  ]
+  const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `nokonoko-analytics-${params.now.toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function exportAnalyticsPDF(params: {
+  now: Date
+  todayRevenue: number
+  todayCount: number
+  weekRevenue: number
+  weekCount: number
+  avgOrder: number
+  topItems: { name: string; qty: number; revenue: number }[]
+  dailyBars: { label: string; value: number }[]
+  hourlyBars: { label: string; value: number }[]
+}) {
+  const dateStr = params.now.toLocaleDateString('en-MY', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  const maxDaily = Math.max(...params.dailyBars.map(b => b.value), 1)
+  const maxQty = params.topItems[0]?.qty ?? 1
+
+  const dailyRows = params.dailyBars.map(b => `
+    <tr>
+      <td>${b.label}</td>
+      <td style="text-align:right;font-weight:700">RM${b.value}</td>
+      <td style="width:40%">
+        <div style="background:#eee;border-radius:4px;height:8px">
+          <div style="background:#1A28FF;border-radius:4px;height:8px;width:${b.value > 0 ? Math.max(4, (b.value / maxDaily) * 100) : 0}%"></div>
+        </div>
+      </td>
+    </tr>`).join('')
+
+  const topRows = params.topItems.slice(0, 8).map((item, i) => `
+    <tr>
+      <td style="color:#aaa;text-align:center">${i + 1}</td>
+      <td style="font-weight:600">${item.name}</td>
+      <td style="text-align:right">${item.qty}</td>
+      <td style="text-align:right;font-weight:700">RM${item.revenue}</td>
+      <td style="width:30%">
+        <div style="background:#eee;border-radius:4px;height:8px">
+          <div style="background:${i === 0 ? '#1A28FF' : '#8890ff'};border-radius:4px;height:8px;width:${Math.max(4, (item.qty / maxQty) * 100)}%"></div>
+        </div>
+      </td>
+    </tr>`).join('')
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+    <title>nokonoko Analytics</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0 }
+      body { font-family: -apple-system, sans-serif; color: #1A28FF; padding: 40px; max-width: 720px; margin: 0 auto }
+      h1 { font-size: 28px; font-weight: 900; letter-spacing: -0.04em }
+      h2 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #8890ff; margin: 28px 0 12px }
+      .date { font-size: 13px; color: #8890ff; margin-top: 4px; margin-bottom: 32px }
+      .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 8px }
+      .kpi { background: #f5f4ff; border-radius: 12px; padding: 14px }
+      .kpi.hi { background: #1A28FF }
+      .kpi-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #8890ff }
+      .kpi.hi .kpi-label { color: rgba(242,237,228,0.7) }
+      .kpi-value { font-size: 20px; font-weight: 900; margin: 4px 0 2px }
+      .kpi.hi .kpi-value { color: #F2EDE4 }
+      .kpi-sub { font-size: 11px; color: #8890ff }
+      .kpi.hi .kpi-sub { color: rgba(242,237,228,0.6) }
+      table { width: 100%; border-collapse: collapse; font-size: 13px }
+      td, th { padding: 8px 10px; border-bottom: 1px solid #eef }
+      th { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #8890ff }
+      tr:last-child td { border-bottom: none }
+      @media print { body { padding: 24px } }
+    </style>
+  </head><body>
+    <h1>nokonoko™ Analytics</h1>
+    <p class="date">${dateStr}</p>
+
+    <h2>Summary</h2>
+    <div class="kpis">
+      <div class="kpi hi">
+        <div class="kpi-label">Today's Revenue</div>
+        <div class="kpi-value">RM${params.todayRevenue}</div>
+        <div class="kpi-sub">${params.todayCount} order${params.todayCount !== 1 ? 's' : ''}</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Week Revenue</div>
+        <div class="kpi-value">RM${params.weekRevenue}</div>
+        <div class="kpi-sub">${params.weekCount} orders</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Avg Order Value</div>
+        <div class="kpi-value">RM${params.avgOrder}</div>
+        <div class="kpi-sub">this week</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Best Seller</div>
+        <div class="kpi-value" style="font-size:14px">${params.topItems[0]?.name ?? '—'}</div>
+        <div class="kpi-sub">${params.topItems[0] ? `${params.topItems[0].qty} sold` : 'no data'}</div>
+      </div>
+    </div>
+
+    <h2>Daily Revenue — Last 7 Days</h2>
+    <table><thead><tr><th>Day</th><th style="text-align:right">Revenue</th><th></th></tr></thead>
+    <tbody>${dailyRows}</tbody></table>
+
+    <h2>Top Items (All Time)</h2>
+    <table><thead><tr><th>#</th><th>Item</th><th style="text-align:right">Sold</th><th style="text-align:right">Revenue</th><th></th></tr></thead>
+    <tbody>${topRows}</tbody></table>
+
+    <script>window.onload = () => { window.print() }</script>
+  </body></html>`
+
+  const blob = new Blob([html], { type: 'text/html' })
+  const url = URL.createObjectURL(blob)
+  window.open(url, '_blank')
+  setTimeout(() => URL.revokeObjectURL(url), 10000)
+}
+
+// ── Page ───────────────────────────────────────────────────────────────────
+
 export default function AnalyticsPage() {
   const { orders } = usePOS()
   const now = useTodayDate()
@@ -152,11 +306,46 @@ export default function AnalyticsPage() {
   const maxDaily = Math.max(...dailyBars.map(b => b.value), 1)
   const maxHourly = Math.max(...hourlyBars.map(b => b.value), 1)
 
+  const exportParams = {
+    now,
+    todayRevenue,
+    todayCount: todayOrders.length,
+    weekRevenue,
+    weekCount: weekOrders.length,
+    avgOrder,
+    topItems,
+    dailyBars,
+    hourlyBars,
+  }
+
+  const hasData = orders.length > 0
+
   return (
     <div className="h-full overflow-y-auto p-4 sm:p-8" style={{ backgroundColor: CREAM }}>
-      <h1 className="text-3xl sm:text-4xl font-black tracking-[-0.03em] mb-6 sm:mb-7" style={{ color: BLUE }}>
-        Analytics
-      </h1>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6 sm:mb-7">
+        <h1 className="text-3xl sm:text-4xl font-black tracking-[-0.03em]" style={{ color: BLUE }}>
+          Analytics
+        </h1>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => exportAnalyticsCSV(exportParams)}
+            disabled={!hasData}
+            className="flex items-center gap-1.5 px-4 py-3 rounded-xl text-xs font-bold border-2 transition-all hover:opacity-80 active:scale-95 disabled:opacity-30"
+            style={{ borderColor: `${BLUE}20`, color: BLUE, backgroundColor: 'white', minHeight: 44 }}
+          >
+            <span>↓</span><span>CSV</span>
+          </button>
+          <button
+            onClick={() => exportAnalyticsPDF(exportParams)}
+            disabled={!hasData}
+            className="flex items-center gap-1.5 px-4 py-3 rounded-xl text-xs font-bold transition-all hover:opacity-90 active:scale-95 disabled:opacity-30"
+            style={{ backgroundColor: BLUE, color: 'white', minHeight: 44 }}
+          >
+            <span>↓</span><span>PDF</span>
+          </button>
+        </div>
+      </div>
 
       {/* KPI row — 2 cols mobile, 4 desktop */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-7">
