@@ -83,6 +83,7 @@ type MenuRow = {
 
 // ── Local storage helpers ─────────────────────────────────────────────────────
 const LS_ORDERS_KEY = 'noko_orders_v1'
+const LS_DELETED_MENU_KEY = 'noko_deleted_menu_v1'
 
 function lsLoadOrders(): CompletedOrder[] {
   if (typeof window === 'undefined') return []
@@ -95,6 +96,33 @@ function lsLoadOrders(): CompletedOrder[] {
 function lsSaveOrders(orders: CompletedOrder[]) {
   if (typeof window === 'undefined') return
   try { localStorage.setItem(LS_ORDERS_KEY, JSON.stringify(orders)) } catch {}
+}
+
+// Track deleted menu item IDs so they stay gone even if Supabase delete fails
+function lsGetDeletedMenuIds(): Set<string> {
+  if (typeof window === 'undefined') return new Set()
+  try {
+    const raw = localStorage.getItem(LS_DELETED_MENU_KEY)
+    return new Set(raw ? JSON.parse(raw) : [])
+  } catch { return new Set() }
+}
+
+function lsMarkMenuDeleted(id: string) {
+  if (typeof window === 'undefined') return
+  try {
+    const ids = lsGetDeletedMenuIds()
+    ids.add(id)
+    localStorage.setItem(LS_DELETED_MENU_KEY, JSON.stringify([...ids]))
+  } catch {}
+}
+
+function lsUnmarkMenuDeleted(id: string) {
+  if (typeof window === 'undefined') return
+  try {
+    const ids = lsGetDeletedMenuIds()
+    ids.delete(id)
+    localStorage.setItem(LS_DELETED_MENU_KEY, JSON.stringify([...ids]))
+  } catch {}
 }
 
 export function POSProvider({ children }: { children: ReactNode }) {
@@ -197,10 +225,13 @@ export function POSProvider({ children }: { children: ReactNode }) {
       // Pre-migration fallback — columns don't exist yet, use basic stock only
       const { data: basic } = await supabase.from('menu_items').select('id, stock')
       if (basic && basic.length > 0) {
-        setMenu(prev => prev.map(item => {
-          const row = basic.find((r: { id: string; stock: number }) => r.id === item.id)
-          return row ? { ...item, stock: row.stock } : item
-        }))
+        const deleted = lsGetDeletedMenuIds()
+        setMenu(prev => prev
+          .filter(item => !deleted.has(item.id))
+          .map(item => {
+            const row = basic.find((r: { id: string; stock: number }) => r.id === item.id)
+            return row ? { ...item, stock: row.stock } : item
+          }))
       } else {
         await supabase.from('menu_items').insert(
           INITIAL_MENU.map(item => ({ id: item.id, stock: item.stock }))
@@ -253,7 +284,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
           lowStockThreshold: r.low_stock_threshold ?? 10,
         }))
 
-      return [...updated, ...custom]
+      // Always honour locally-tracked deletions (Supabase delete may have failed)
+      const deleted = lsGetDeletedMenuIds()
+      return [...updated, ...custom].filter(m => !deleted.has(m.id))
     })
   }
 
@@ -413,6 +446,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const addMenuItem = useCallback(async (item: Omit<MenuItem, 'id'>) => {
     const id = `custom-${Date.now()}`
+    lsUnmarkMenuDeleted(id)        // ensure a newly-added ID isn't blocked
     const full: MenuItem = { ...item, id }
     setMenu(prev => [...prev, full])
     await supabase.from('menu_items').insert({
@@ -434,6 +468,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, [menu])
 
   const deleteMenuItem = useCallback(async (id: string) => {
+    lsMarkMenuDeleted(id)          // persist deletion locally before Supabase
     setMenu(prev => prev.filter(m => m.id !== id))
     await supabase.from('menu_items').delete().eq('id', id)
   }, [])
