@@ -39,21 +39,78 @@ function groupByDate(orders: CompletedOrder[], ref: Date): { label: string; orde
   return groups
 }
 
-function exportCSV(orders: CompletedOrder[], filename: string) {
-  const rows = [
-    ['Order #', 'Date', 'Time', 'Items', 'Total (RM)'],
-    ...orders.map(o => {
+function exportCSV(orders: CompletedOrder[], filename: string, periodLabel: string) {
+  if (orders.length === 0) return
+
+  const exportedAt = new Date().toLocaleDateString('en-MY', { day: '2-digit', month: 'long', year: 'numeric' })
+  const totalRevenue = orders.reduce((s, o) => s + o.total, 0)
+  const avgOrder = Math.round(totalRevenue / orders.length)
+
+  // ── Daily breakdown ──────────────────────────────────────────────────────
+  const dayMap: Record<string, { orders: number; revenue: number }> = {}
+  orders.forEach(o => {
+    const key = new Date(o.timestamp).toLocaleDateString('en-MY', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    if (!dayMap[key]) dayMap[key] = { orders: 0, revenue: 0 }
+    dayMap[key].orders += 1
+    dayMap[key].revenue += o.total
+  })
+  const dailyRows = Object.entries(dayMap)
+    .sort(([a], [b]) => new Date(a.split('/').reverse().join('-')).getTime() - new Date(b.split('/').reverse().join('-')).getTime())
+    .map(([date, d]) => [date, d.orders, d.revenue])
+
+  // ── Product sales ────────────────────────────────────────────────────────
+  const productMap: Record<string, { qty: number; revenue: number }> = {}
+  orders.forEach(o =>
+    o.items.forEach(i => {
+      const key = i.displayName + (i.temperature ? ` (${i.temperature})` : '')
+      if (!productMap[key]) productMap[key] = { qty: 0, revenue: 0 }
+      productMap[key].qty += i.quantity
+      productMap[key].revenue += i.price * i.quantity
+    })
+  )
+  const productRows = Object.entries(productMap)
+    .sort(([, a], [, b]) => b.qty - a.qty)
+    .map(([name, p]) => [name, p.qty, p.revenue])
+
+  // ── Order detail ─────────────────────────────────────────────────────────
+  const orderRows = orders
+    .slice()
+    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+    .map(o => {
       const d = new Date(o.timestamp)
       const date = d.toLocaleDateString('en-MY', { day: '2-digit', month: '2-digit', year: 'numeric' })
       const time = d.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' })
-      const items = o.items
-        .map(i => `${i.displayName}${i.temperature ? ` (${i.temperature})` : ''} x${i.quantity}`)
-        .join('; ')
-      return [o.id, date, time, `"${items}"`, o.total]
-    }),
+      const items = o.items.map(i => `${i.displayName}${i.temperature ? ` (${i.temperature})` : ''} x${i.quantity}`).join('; ')
+      return [o.id, date, time, o.customerName ?? '', `"${items}"`, o.total]
+    })
+
+  // ── Assemble ─────────────────────────────────────────────────────────────
+  const q = (v: string | number) => `"${v}"`
+  const row = (cells: (string | number)[]) => cells.map(c => q(c)).join(',')
+
+  const lines = [
+    row([`nokonoko™ Sales Report — ${periodLabel}`]),
+    row([`Exported: ${exportedAt}`]),
+    '',
+    row(['SUMMARY']),
+    row(['Total Orders', orders.length]),
+    row(['Total Revenue (RM)', totalRevenue]),
+    row(['Average Order Value (RM)', avgOrder]),
+    '',
+    row(['DAILY BREAKDOWN']),
+    row(['Date', 'Orders', 'Revenue (RM)']),
+    ...dailyRows.map(r => row(r)),
+    '',
+    row(['PRODUCT SALES']),
+    row(['Product', 'Qty Sold', 'Revenue (RM)']),
+    ...productRows.map(r => row(r)),
+    '',
+    row(['ORDER DETAIL']),
+    row(['Order #', 'Date', 'Time', 'Customer', 'Items', 'Total (RM)']),
+    ...orderRows.map(r => row(r)),
   ]
-  const csv = rows.map(r => r.join(',')).join('\n')
-  const blob = new Blob([csv], { type: 'text/csv' })
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -138,7 +195,7 @@ export default function HistoryPage() {
           />
 
           <button
-            onClick={() => exportCSV(monthOrders, `nokonoko-${monthLabel}.csv`)}
+            onClick={() => exportCSV(monthOrders, `nokonoko-${monthLabel}.csv`, monthLabel)}
             disabled={monthOrders.length === 0}
             className="flex items-center gap-1 px-4 py-3 rounded-xl text-xs font-bold border-2 transition-all hover:opacity-80 active:scale-95 disabled:opacity-30"
             style={{ borderColor: `${BLUE}20`, color: BLUE, backgroundColor: 'white', minHeight: 44 }}
@@ -147,7 +204,7 @@ export default function HistoryPage() {
           </button>
 
           <button
-            onClick={() => exportCSV(yearOrders, `nokonoko-${yearLabel}.csv`)}
+            onClick={() => exportCSV(yearOrders, `nokonoko-${yearLabel}.csv`, yearLabel)}
             disabled={yearOrders.length === 0}
             className="flex items-center gap-1 px-4 py-3 rounded-xl text-xs font-bold border-2 transition-all hover:opacity-80 active:scale-95 disabled:opacity-30"
             style={{ borderColor: `${BLUE}20`, color: BLUE, backgroundColor: 'white', minHeight: 44 }}
