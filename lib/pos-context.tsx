@@ -96,10 +96,23 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }
 
   async function loadOrders() {
-    const { data, error } = await supabase
+    // Try with customer_name first (post-migration)
+    let { data, error } = await supabase
       .from('orders')
       .select(`id, order_number, customer_name, subtotal, total, timestamp, order_items(menu_item_id, display_name, temperature, price, quantity)`)
       .order('timestamp', { ascending: false })
+
+    let hasCustomerName = true
+    if (error) {
+      // Pre-migration fallback — customer_name column doesn't exist yet
+      hasCustomerName = false
+      const result = await supabase
+        .from('orders')
+        .select(`id, order_number, subtotal, total, timestamp, order_items(menu_item_id, display_name, temperature, price, quantity)`)
+        .order('timestamp', { ascending: false })
+      data = result.data
+      error = result.error
+    }
 
     if (error || !data) return
 
@@ -114,7 +127,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }) => ({
       id: o.id,
       orderNumber: o.order_number,
-      customerName: o.customer_name ?? undefined,
+      customerName: hasCustomerName ? (o.customer_name ?? undefined) : undefined,
       subtotal: o.subtotal,
       total: o.total,
       timestamp: o.timestamp,
@@ -230,7 +243,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const orderId = `N-${String(nextOrderNumber).padStart(4, '0')}`
     const timestamp = new Date().toISOString()
 
-    const { error: orderErr } = await supabase.from('orders').insert({
+    let { error: orderErr } = await supabase.from('orders').insert({
       id: orderId,
       order_number: nextOrderNumber,
       customer_name: customerName || null,
@@ -238,7 +251,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
       total,
       timestamp,
     })
-    if (orderErr) { console.error('Order insert failed:', orderErr); return null }
+    if (orderErr) {
+      // Pre-migration fallback — customer_name column may not exist yet
+      const result = await supabase.from('orders').insert({
+        id: orderId,
+        order_number: nextOrderNumber,
+        subtotal: total,
+        total,
+        timestamp,
+      })
+      orderErr = result.error
+      if (orderErr) { console.error('Order insert failed:', orderErr); return null }
+    }
 
     await supabase.from('order_items').insert(
       cart.map(c => ({
