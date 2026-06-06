@@ -57,6 +57,7 @@ interface POSContextType {
   updatePrice: (itemId: string, prices: PriceUpdate) => Promise<void>
   addMenuItem: (item: Omit<MenuItem, 'id'>) => Promise<void>
   updateMenuItem: (id: string, updates: Omit<MenuItem, 'id'>) => Promise<void>
+  deleteMenuItem: (id: string) => Promise<void>
   nextOrderNumber: number
 }
 
@@ -431,11 +432,16 @@ export function POSProvider({ children }: { children: ReactNode }) {
     })
   }, [menu])
 
+  const deleteMenuItem = useCallback(async (id: string) => {
+    setMenu(prev => prev.filter(m => m.id !== id))
+    await supabase.from('menu_items').delete().eq('id', id)
+  }, [])
+
   return (
     <POSContext.Provider value={{
       menu, cart, orders, loading,
       addToCart, updateQty, clearCart, checkout, cancelOrder,
-      updateStock, updatePrice, addMenuItem, updateMenuItem,
+      updateStock, updatePrice, addMenuItem, updateMenuItem, deleteMenuItem,
       nextOrderNumber,
     }}>
       {children}

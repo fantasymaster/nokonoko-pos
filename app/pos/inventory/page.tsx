@@ -536,10 +536,11 @@ function PriceRow({ itemId, hasTemperature, hotPrice, icedPrice, fixedPrice }: {
 // ── Main Page ──────────────────────────────────────────────────────────────
 
 export default function InventoryPage() {
-  const { menu, updateStock } = usePOS()
+  const { menu, updateStock, deleteMenuItem } = usePOS()
   const [addInputs, setAddInputs] = useState<Record<string, string>>({})
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   const outCount = menu.filter(m => m.stock === 0).length
   const lowCount = menu.filter(m => m.stock > 0 && m.stock <= m.lowStockThreshold).length
@@ -589,7 +590,7 @@ export default function InventoryPage() {
       </div>
 
       {/* Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4" onClick={e => { if (e.target === e.currentTarget) setConfirmDelete(null) }}>
         {menu.map(item => {
           const displayName = item.modifier ? `${item.name} ${item.modifier}` : item.name
           const { label, color } = statusFor(item.stock, item.lowStockThreshold)
@@ -622,6 +623,23 @@ export default function InventoryPage() {
                   >
                     Edit
                   </button>
+                  {confirmDelete === item.id ? (
+                    <button
+                      onClick={() => { deleteMenuItem(item.id); setConfirmDelete(null) }}
+                      className="text-xs font-bold px-3 py-2 rounded-xl transition-all active:scale-95"
+                      style={{ backgroundColor: '#FEE2E2', color: '#EF4444', minHeight: 36 }}
+                    >
+                      Confirm?
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmDelete(item.id)}
+                      className="text-xs font-bold px-3 py-2 rounded-xl transition-all hover:opacity-70 active:scale-95"
+                      style={{ backgroundColor: `${'#EF4444'}15`, color: '#EF4444', minHeight: 36 }}
+                    >
+                      Delete
+                    </button>
+                  )}
                 </div>
               </div>
 
