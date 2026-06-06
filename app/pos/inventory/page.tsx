@@ -286,15 +286,12 @@ function EditProductModal({ item, onClose }: { item: MenuItem; onClose: () => vo
   const [hotPrice, setHotPrice] = useState(String(item.hotPrice ?? ''))
   const [icedPrice, setIcedPrice] = useState(String(item.icedPrice ?? ''))
   const [fixedPrice, setFixedPrice] = useState(String(item.fixedPrice ?? ''))
-  const [stock, setStock] = useState(String(item.stock))
-  const [unit, setUnit] = useState(item.unit)
-  const [threshold, setThreshold] = useState(String(item.lowStockThreshold))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   const canSave = name.trim() !== '' && (
     hasTemperature ? (hotPrice !== '' && icedPrice !== '') : fixedPrice !== ''
-  ) && stock !== ''
+  )
 
   const handleSave = async () => {
     if (!canSave) { setError('Please fill in all required fields.'); return }
@@ -308,9 +305,9 @@ function EditProductModal({ item, onClose }: { item: MenuItem; onClose: () => vo
       hotPrice: hasTemperature ? Number(hotPrice) : undefined,
       icedPrice: hasTemperature ? Number(icedPrice) : undefined,
       fixedPrice: !hasTemperature ? Number(fixedPrice) : undefined,
-      stock: Number(stock),
-      unit: unit.trim() || 'cups',
-      lowStockThreshold: Number(threshold) || 10,
+      stock: item.stock,
+      unit: item.unit,
+      lowStockThreshold: item.lowStockThreshold,
     })
     setSaving(false)
     onClose()
@@ -403,25 +400,6 @@ function EditProductModal({ item, onClose }: { item: MenuItem; onClose: () => vo
                 className="w-full rounded-xl px-4 py-3 text-sm font-semibold border-2 outline-none" style={{ borderColor: `${BLUE}20`, color: BLUE }} />
             </div>
           )}
-
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <label className="block text-[11px] font-bold uppercase tracking-widest mb-1.5" style={{ color: `${BLUE}60` }}>Stock *</label>
-              <input type="number" min="0" value={stock} onChange={e => setStock(e.target.value)} placeholder="0"
-                className="w-full rounded-xl px-4 py-3 text-sm font-semibold border-2 outline-none" style={{ borderColor: `${BLUE}20`, color: BLUE }} />
-            </div>
-            <div className="flex-1">
-              <label className="block text-[11px] font-bold uppercase tracking-widest mb-1.5" style={{ color: `${BLUE}60` }}>Unit</label>
-              <input value={unit} onChange={e => setUnit(e.target.value)} placeholder="cups"
-                className="w-full rounded-xl px-4 py-3 text-sm font-semibold border-2 outline-none" style={{ borderColor: `${BLUE}20`, color: BLUE }} />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-widest mb-1.5" style={{ color: `${BLUE}60` }}>Low Stock Alert</label>
-            <input type="number" min="1" value={threshold} onChange={e => setThreshold(e.target.value)}
-              className="w-full rounded-xl px-4 py-3 text-sm font-semibold border-2 outline-none" style={{ borderColor: `${BLUE}20`, color: BLUE }} />
-          </div>
 
           {error && <p className="text-xs font-semibold text-red-500">{error}</p>}
         </div>
