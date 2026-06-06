@@ -32,9 +32,9 @@ export function POSNav() {
 
   const tabs = [
     { label: 'Order', href: '/pos' },
-    { label: 'Analytics', href: '/pos/analytics' },
+    { label: 'Sales', href: '/pos/analytics' },
     { label: 'Inventory', href: '/pos/inventory', badge: alertCount || undefined },
-    { label: 'History', href: '/pos/history' },
+    { label: 'Order History', href: '/pos/history' },
   ]
 
   return (
