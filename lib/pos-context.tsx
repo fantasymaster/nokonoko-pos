@@ -143,6 +143,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
   async function loadAll() {
     setLoading(true)
     await Promise.all([loadOrders(), loadStock()])
+    // Final safety net: apply deletions regardless of which loadStock path ran
+    const deleted = lsGetDeletedMenuIds()
+    if (deleted.size > 0) {
+      setMenu(prev => prev.filter(m => !deleted.has(m.id)))
+    }
     setLoading(false)
   }
 
